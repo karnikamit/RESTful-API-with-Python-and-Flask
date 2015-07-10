@@ -1,0 +1,66 @@
+__author__ = 'karnikamit'
+from flask import Flask, request, jsonify, render_template, url_for
+app = Flask(__author__)
+import json
+from functools import wraps
+
+
+def check_auth(username, password):
+    return username == 'admin' and password == 'karnik'
+
+def authenticate():
+    message = {'message': "Authenticate."}
+    resp = jsonify(message)
+
+    resp.status_code = 401
+    resp.headers['WWW-Authenticate'] = 'Basic realm="Example"'
+
+    return resp
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth:
+            return authenticate()
+
+        elif not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+@app.route('/start', methods=["GET"])
+@requires_auth
+def start():
+    navigation = {'1': {'href': url_for('begin'), 'caption': "Try"}}
+    return render_template('p.html', n=navigation)
+
+
+@app.route('/begin', methods=["GET", "POST"])
+def begin():
+    data = {'1': list(range(10))}
+    return jsonify(data)
+
+
+@app.route('/messages', methods=['POST'])
+def api_message():
+
+    if request.headers['Content-Type'] == 'text/plain':
+        return "Text Message: " + request.data
+
+    elif request.headers['Content-Type'] == 'application/json':
+        return "JSON Message: " + json.dumps(request.json)
+
+    elif request.headers['Content-Type'] == 'application/octet-stream':
+        f = open('./binary', 'wb')
+        f.write(request.data)
+        f.close()
+        return "Binary message written!"
+
+    else:
+        return "415 Unsupported Media Type ;)"
+
+if __author__ == 'karnikamit':
+    app.run(host="0.0.0.0", port=7777, debug=True)
